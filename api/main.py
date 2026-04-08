@@ -149,11 +149,20 @@ async def run_query(
             ref_feature = get_preset_color_feature(cf)
         else:
             ref_feature = idx.get_feature(cf)
-    if ref_feature is None:
-        ref_feature = get_preset_color_feature("bright")
 
     try:
-        results = idx.search_among(ref_feature, candidate_ids, k=k)
+        # If we have a feature (from query video or color filter), use feature-based ranking
+        if ref_feature is not None:
+            results = idx.search_among(ref_feature, candidate_ids, k=k)
+        else:
+            # No query intent: just return candidate videos in index order
+            id_to_idx = {vid: i for i, vid in enumerate(idx.ids)}
+            candidates = [(id_to_idx[vid], vid) for vid in candidate_ids if vid in id_to_idx]
+            candidates.sort(key=lambda x: x[0])
+            results = [
+                (idx.ids[i], idx.paths[i], 0.0)
+                for i, _ in candidates[: min(k, len(candidates))]
+            ]
         elapsed = time.perf_counter() - t0
         query_object = types_to_use[0] if types_to_use else None
         out_results = []
